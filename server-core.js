@@ -9,7 +9,7 @@ var messages = [];
 
 server.get('/messages', function (req, res) {
     var resultMessages = [];
-    if (req.query.from === undefined && req.query.from === undefined) {
+    if (req.query.from === undefined && req.query.to === undefined) {
         resultMessages = messages;
     } else if (req.query.from === undefined) {
         resultMessages = messages.filter(message => message.to === req.query.to);
