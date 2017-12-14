@@ -3,40 +3,41 @@
 module.exports.execute = execute;
 module.exports.isStar = false;
 
-const program = require('commander');
+const ArgumentParser = require('argparse').ArgumentParser;
 const chalk = require('chalk');
 const rp = require('request-promise');
 
 const red = chalk.hex('#f00');
 const green = chalk.hex('#0f0');
 
-const rootUrl = 'http://localhost:8080/messages/';
+const rootUrl = 'http://localhost:8080/messages';
 
 function execute() {
-    return new Promise((resolve, reject) => {
-        program.command('list')
-            .description('show messages list')
-            .option('-s, --from <sender>', 'message sender')
-            .option('-r, --to <recipient>', 'message recipient')
-            .action(function (params) {
-                getMessagesList(params.from, params.to)
-                    .then(resolve)
-                    .catch(reject);
-            });
+    const argsParser = getArgsParser();
+    const args = argsParser.parseArgs(process.argv.slice(2));
 
-        program.command('send')
-            .description('send message to the server')
-            .option('-s, --from <sender>', 'message sender')
-            .option('-r, --to <recipient>', 'message recipient')
-            .option('-t, --text <messageText>', 'message text')
-            .action(function (params) {
-                sendMessage(params.from, params.to, params.text)
-                    .then(resolve)
-                    .catch(reject);
-            });
+    switch (args.command) {
+        case 'list':
+            return getMessagesList(args.from, args.to);
+        case 'send':
+            return sendMessage(args.from, args.to, args.text);
+        default:
+            Promise.reject('client doesn\'t support this command');
+            break;
+    }
+}
 
-        program.parse(process.argv);
+function getArgsParser() {
+    const argsParser = new ArgumentParser();
+    argsParser.addArgument('command', {
+        help: 'command name',
+        choices: ['list', 'send']
     });
+    argsParser.addArgument('--from', { help: 'message sender' });
+    argsParser.addArgument('--to', { help: 'message recipient' });
+    argsParser.addArgument('--text', { help: 'message text' });
+
+    return argsParser;
 }
 
 function sendMessage(from, to, text) {
@@ -45,8 +46,8 @@ function sendMessage(from, to, text) {
             {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                url: rootUrl,
-                qs: { from: from, to: to },
+                uri: rootUrl,
+                qs: getDefinedQueryArguments(from, to),
                 body: { 'text': text },
                 json: true
             })
@@ -58,8 +59,9 @@ function sendMessage(from, to, text) {
 function getMessagesList(from, to) {
     return new Promise((resolve, reject) => {
         rp({
-            url: rootUrl,
-            qs: { from: from, to: to },
+            method: 'GET',
+            uri: rootUrl,
+            qs: getDefinedQueryArguments(from, to),
             json: true
         })
             .then((resp) => {
@@ -71,6 +73,18 @@ function getMessagesList(from, to) {
     });
 }
 
+function getDefinedQueryArguments(from, to) {
+    var args = {};
+    if (from) {
+        args.from = from;
+    }
+
+    if (to) {
+        args.to = to;
+    }
+
+    return args;
+}
 function messageToString(message) {
     var convertedMessage = '';
     if (message.from !== undefined) {
